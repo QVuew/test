@@ -38,13 +38,22 @@ public class UPINotificationListener extends NotificationListenerService {
     // Keywords indicating RECEIVED money (not sent)
     private static final String[] RECEIVED_KEYWORDS = {
         "received", "credited", "credit", "added", "deposited",
+        "paid you",        // "Nabil paid you ₹500" — GPay style
+        "sent you",        // "Nabil sent you ₹500"
+        "transferred you",
         "पाया", "प्राप्त", "जमा", "मिला"  // Hindi keywords
     };
 
-    // Keywords to EXCLUDE (sent/debited transactions)
+    // Keywords to EXCLUDE (sent/debited transactions) — checked AFTER received keywords
     private static final String[] SENT_KEYWORDS = {
-        "sent", "paid", "debited", "debit", "payment of", "you paid",
-        "transferred to", "withdrawn"
+        "you paid",        // "You paid ₹500 to Nabil"
+        "you sent",        // "You sent ₹500"
+        "debited",
+        "debit",
+        "payment of",
+        "transferred to",
+        "withdrawn"
+        // NOTE: "paid" and "sent" alone are NOT here — "paid you" / "sent you" means received
     };
 
     // Regex patterns to extract amount
@@ -128,17 +137,23 @@ public class UPINotificationListener extends NotificationListenerService {
     }
 
     private boolean isMoneyReceived(String text) {
-        // First check if it's a sent transaction - exclude those
+        // Step 1: Check for RECEIVED keywords first (e.g. "paid you", "sent you", "credited")
+        boolean hasReceivedKeyword = false;
+        for (String receivedKeyword : RECEIVED_KEYWORDS) {
+            if (text.contains(receivedKeyword)) {
+                hasReceivedKeyword = true;
+                break;
+            }
+        }
+
+        if (!hasReceivedKeyword) return false;
+
+        // Step 2: Make sure it's not a SENT transaction (e.g. "you paid", "debited")
         for (String sentKeyword : SENT_KEYWORDS) {
             if (text.contains(sentKeyword)) return false;
         }
 
-        // Then check for received keywords
-        for (String receivedKeyword : RECEIVED_KEYWORDS) {
-            if (text.contains(receivedKeyword)) return true;
-        }
-
-        return false;
+        return true;
     }
 
     private String extractAmount(String text) {
